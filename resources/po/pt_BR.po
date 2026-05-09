@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Copyous\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-26 12:23-0500\n"
+"POT-Creation-Date: 2026-05-09 16:27+0000\n"
 "PO-Revision-Date: 2025-12-01 18:02-0300\n"
 "Last-Translator: Murilo Leal <murilormleal@outlook.com>\n"
 "Language-Team: Portuguese (Brazil)\n"
@@ -1709,47 +1709,47 @@ msgstr "Desativar Atalho"
 msgid "Disabled"
 msgstr "Desabilitado"
 
-#: src/lib/ui/components/contentInfo.ts:32
+#: src/lib/ui/components/contentInfo.ts:35
 #, javascript-format
 msgid "%dh"
 msgstr "%dh"
 
-#: src/lib/ui/components/contentInfo.ts:33
+#: src/lib/ui/components/contentInfo.ts:36
 #, javascript-format
 msgid "%dm"
 msgstr "%dm"
 
-#: src/lib/ui/components/contentInfo.ts:34
+#: src/lib/ui/components/contentInfo.ts:37
 #, javascript-format
 msgid "%ds"
 msgstr "%ds"
 
-#: src/lib/ui/components/contentInfo.ts:106
+#: src/lib/ui/components/contentInfo.ts:116
 #, javascript-format
 msgid "%d char"
 msgid_plural "%d chars"
 msgstr[0] "%d caractere"
 msgstr[1] "%d caracteres"
 
-#: src/lib/ui/components/contentInfo.ts:114
+#: src/lib/ui/components/contentInfo.ts:123
 #, javascript-format
 msgid "%d word"
 msgid_plural "%d words"
 msgstr[0] "%d palavra"
 msgstr[1] "%d palavras"
 
-#: src/lib/ui/components/contentInfo.ts:117
+#: src/lib/ui/components/contentInfo.ts:126
 #, javascript-format
 msgid "%d line"
 msgid_plural "%d lines"
 msgstr[0] "%d linha"
 msgstr[1] "%d linhas"
 
-#: src/lib/ui/components/contentInfo.ts:177
+#: src/lib/ui/components/contentInfo.ts:186
 msgid "Missing File"
 msgstr "Arquivo faltando"
 
-#: src/lib/ui/components/contentInfo.ts:189
+#: src/lib/ui/components/contentInfo.ts:198
 msgid "Error"
 msgstr "Erro"
 
@@ -1826,43 +1826,43 @@ msgstr "Área de Transferência Vazia"
 msgid "No Items Found"
 msgstr "Nenhum item encontrado"
 
-#: src/lib/ui/searchEntry.ts:150
+#: src/lib/ui/searchEntry.ts:151
 msgid "__All"
 msgstr "__Tudo"
 
-#: src/lib/ui/searchEntry.ts:154
+#: src/lib/ui/searchEntry.ts:155
 msgid "__Text"
 msgstr "__Texto"
 
-#: src/lib/ui/searchEntry.ts:155
+#: src/lib/ui/searchEntry.ts:156
 msgid "__Code"
 msgstr "__Código"
 
-#: src/lib/ui/searchEntry.ts:156
+#: src/lib/ui/searchEntry.ts:157
 msgid "__Image"
 msgstr "__Imagem"
 
-#: src/lib/ui/searchEntry.ts:157
+#: src/lib/ui/searchEntry.ts:158
 msgid "__File"
 msgstr "__Arquivo"
 
-#: src/lib/ui/searchEntry.ts:158
+#: src/lib/ui/searchEntry.ts:159
 msgid "File__s"
 msgstr "Arquivos__s"
 
-#: src/lib/ui/searchEntry.ts:159
+#: src/lib/ui/searchEntry.ts:160
 msgid "__Link"
 msgstr "__Link"
 
-#: src/lib/ui/searchEntry.ts:160
+#: src/lib/ui/searchEntry.ts:161
 msgid "C__haracter"
 msgstr "C__ractere"
 
-#: src/lib/ui/searchEntry.ts:161
+#: src/lib/ui/searchEntry.ts:162
 msgid "Colo__r"
 msgstr "Co__r"
 
-#: src/lib/ui/searchEntry.ts:273
+#: src/lib/ui/searchEntry.ts:274
 msgid "Type to search"
 msgstr "Digite para pesquisar"
 
