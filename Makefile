@@ -210,7 +210,7 @@ uninstall:
 
 # Launch
 HAS_DEVKIT := $(shell gnome-shell --help | grep -q -- --devkit && echo 1)
-MUTTER_DEVKIT := $(wildcard $(or $(shell command -V mutter-devkit 2>/dev/null), /usr/libexec/mutter-devkit))
+MUTTER_DEVKIT := $(or $(shell command -V mutter-devkit 2>/dev/null),$(wildcard /usr/libexec/mutter-devkit),$(wildcard /usr/lib/mutter-devkit))
 
 export MUTTER_DEBUG_DUMMY_MODE_SPECS=$(RESOLUTION)
 export CLUTTER_TEXT_DIRECTION=$(TEXT_DIRECTION)
