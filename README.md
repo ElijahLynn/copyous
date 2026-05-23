@@ -113,34 +113,8 @@ gdbus call --session \
     --method org.gnome.Shell.Extensions.Copyous.ClearHistory false
 ```
 
-## Development
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for general setup (linting, building, running a nested shell).
-
-### Profiling
-Performance instrumentation is included to diagnose slow first-open and similar issues.
-
-**Phase 1 (current):** timing logs guarded by `/* DEBUG-ONLY */` comments in source. Always on in dev builds, stripped from release builds by the Makefile.
-
-To capture timings:
-1. Build a dev build: `make install` (do *not* pass `RELEASE=1`).
-2. Reload the extension — `gnome-extensions disable copyous@boerdereinar.dev && gnome-extensions enable copyous@boerdereinar.dev` (or log out/in).
-3. Trigger the path you want to measure (e.g. open the clipboard dialog).
-4. Read logs:
-   ```shell
-   journalctl --user --since "2 minutes ago" /usr/bin/gnome-shell | grep '\[perf\]'
-   ```
-
-Spans currently emitted:
-- `[perf] initEntryTracker: N entries, load=Xms build=Yms` — entries loaded from the database vs. time to construct `ClipboardItem` actors (measured at extension enable).
-- `[perf] dialog.open: sync=Xms toIdle=Yms` — synchronous work inside `open()` vs. time from `open()` entry to next idle dispatch (a proxy for first-paint completion).
-
-**Planned phases:**
-- Phase 2 — runtime toggle via gsettings (`enable-perf-logging`).
-- Phase 3 — benchmark mode (`COPYOUS_PERF=1`) that generates synthetic entries and drives `open()` programmatically for reproducible numbers.
-- Phase 4 — optional GJS native profiler / Sysprof capture via `gnome-shell --profile`.
-
-## Contributing
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for more information.
+## Contributing & Development
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, the nested-shell test workflow, and the built-in performance profiling instrumentation.
 
 ## Acknowledgments
 Copyous is a full rewrite of [Pano](https://github.com/oae/gnome-shell-pano).
