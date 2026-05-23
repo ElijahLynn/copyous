@@ -1,4 +1,5 @@
 import Clutter from 'gi://Clutter';
+import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Gio from 'gi://Gio';
 import Graphene from 'gi://Graphene';
@@ -422,6 +423,8 @@ export class ClipboardDialog extends St.Widget {
 	public open() {
 		if (this.opened || this._closing) return;
 
+		/* DEBUG-ONLY */ const _perfT0 = GLib.get_monotonic_time();
+
 		this._updateCursor = false;
 		this._nextCursor = this._cursor;
 
@@ -480,6 +483,15 @@ export class ClipboardDialog extends St.Widget {
 			scaleY: 1,
 			duration: ANIMATION_TIME,
 			mode,
+		});
+
+		/* DEBUG-ONLY */ const _perfT1 = GLib.get_monotonic_time();
+		/* DEBUG-ONLY */ GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+			const t2 = GLib.get_monotonic_time();
+			this.ext.logger.log(
+				`[perf] dialog.open: sync=${((_perfT1 - _perfT0) / 1000).toFixed(0)}ms toIdle=${((t2 - _perfT0) / 1000).toFixed(0)}ms`,
+			);
+			return GLib.SOURCE_REMOVE;
 		});
 	}
 
