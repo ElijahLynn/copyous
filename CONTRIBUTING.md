@@ -30,11 +30,14 @@ cp .env.template .env
 ```
 
 Key variables:
-- `DBPATH` — path to the SQLite database used by the nested shell. Defaults to a generated test DB with 40 entries (`dist/database/test.db`). **Set this to empty** (`DBPATH =`) to point the nested shell at your real personal clipboard data.
-- `DEBUG_SCHEMA` — path to a dconf-format settings file loaded into `/org/gnome/shell/extensions/copyous/debug/` before launch. Useful for overriding settings (e.g. a non-conflicting shortcut) just for the nested session.
+- `DBPATH` — path to the SQLite database used by the nested shell. Defaults to a generated test DB with 40 entries (`dist/database/test.db`). Set this to empty (`DBPATH =`) to point the nested shell at your real personal clipboard data.
+- `DEBUG_SCHEMA` — path to a dconf-format settings file loaded into `/org/gnome/shell/extensions/copyous/debug/` before launch. Useful for overriding settings (e.g. a non-conflicting shortcut) just for the nested session. The literal `default` (also the Makefile default) means "no override — use the user's real settings."
 - `GDA_VERSION` — pin `5.0` or `6.0` when both libgda majors are installed.
 - `ACTIONS` — path to a custom actions config; `default` uses the built-in.
 - `RESOLUTION` / `TEXT_DIRECTION` — nested-shell window sizing and RTL toggle (only effective on GNOME Shell ≤ 48; GNOME 49+ uses `mutter-devkit` and ignores these).
+
+> [!CAUTION]
+> **Combining `DBPATH=` (empty, real data) with a custom `DEBUG_SCHEMA` file will silently prune your real clipboard history.** The `.debug` schema namespace has independent defaults — notably `history-length=50` — and the extension's `init()` calls `deleteOldest()` against the debug-schema value, then writes the pruned result back to disk. If your custom debug schema has a low `history-length`, your real clipboard data file will be shrunk to that count on the nested shell's first `init()`. Always back up `~/.local/share/copyous@boerdereinar.dev/clipboard.json` before pointing the nested shell at it, or include `history-length` and `history-time` in your custom debug schema with values that match (or exceed) your real settings.
 
 ### Debugging
 > [!IMPORTANT]

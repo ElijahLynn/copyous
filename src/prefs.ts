@@ -156,7 +156,7 @@ export default class Preferences extends ExtensionPreferences {
 		try {
 			const environment = GLib.get_environ();
 			const settings = GLib.environ_getenv(environment, 'DEBUG_COPYOUS_SCHEMA');
-			if (settings) schema ??= this.metadata['settings-schema'] + '.debug';
+			if (settings && settings !== 'default') schema ??= this.metadata['settings-schema'] + '.debug';
 
 			return super.getSettings(schema) as Gio.Settings & CopyousSettings;
 		} catch {

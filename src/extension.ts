@@ -355,7 +355,7 @@ export default class CopyousExtension extends Extension {
 		try {
 			const environment = GLib.get_environ();
 			const settings = GLib.environ_getenv(environment, 'DEBUG_COPYOUS_SCHEMA');
-			if (settings) {
+			if (settings && settings !== 'default') {
 				this.getLogger().log('Using debug schema');
 				schema ??= this.metadata['settings-schema'] + '.debug';
 			}

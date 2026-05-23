@@ -214,7 +214,11 @@ MUTTER_DEVKIT := $(or $(shell command -V mutter-devkit 2>/dev/null),$(wildcard /
 
 export MUTTER_DEBUG_DUMMY_MODE_SPECS=$(RESOLUTION)
 export CLUTTER_TEXT_DIRECTION=$(TEXT_DIRECTION)
-export DEBUG_COPYOUS_SCHEMA=$(DEBUG_SCHEMA)
+# Only pass DEBUG_COPYOUS_SCHEMA downstream when the user supplied a real path.
+# Passing the literal "default" causes the extension to switch to the .debug
+# schema namespace, which has independent defaults (notably history-length=50)
+# that will silently prune the user's real clipboard data on startup.
+export DEBUG_COPYOUS_SCHEMA=$(filter-out default,$(DEBUG_SCHEMA))
 export DEBUG_COPYOUS_DBPATH=$(DBPATH)
 export DEBUG_COPYOUS_GDA_VERSION=$(GDA_VERSION)
 export DEBUG_COPYOUS_ACTIONS=$(ACTIONS)
