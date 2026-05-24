@@ -113,6 +113,25 @@ To capture them: build a dev build (`make install` — not `RELEASE=1`), reload 
 - Phase 3 — benchmark mode (`COPYOUS_PERF=1`) that generates synthetic entries of configurable size/type mix and drives `open()` programmatically over DBus for reproducible numbers. Pair with a `scripts/bench.sh` that prints before/after deltas.
 - Phase 4 — optional GJS native profiler integration via `gnome-shell --profile=$out.syscap` for flame graphs.
 
+### Performance budget
+When changing the dialog open path or per-item construction, verify against these thresholds. They're anchored to the [RAIL / Jakob Nielsen "feels instant" threshold of 100ms](https://web.dev/articles/rail) and validated against measurements where ~200ms produced "SSH-from-across-the-world" lag reports.
+
+| Metric | Target | Notes |
+|---|---|---|
+| Warm `dialog.open: toIdle` median | < 100ms | Direct-input UI should feel instant. |
+| Warm `dialog.open: toIdle` p95 | < 150ms | Bounds variance from periodic interference (other extensions' poll timers, GC pauses, Mutter compositor work) so "sometimes slow" disappears. |
+| Cold `dialog.open: toIdle` (first open per shell session) | < 200ms | One-time cost per login; tolerable above warm budget but still visible if it grows. |
+| `initEntryTracker: build` for N=500 entries | < 200ms | Login-time freeze tolerance (issue #139). |
+
+How to measure:
+1. Reload extension to force cold: `gnome-extensions disable copyous@boerdereinar.dev && sleep 3 && gnome-extensions enable copyous@boerdereinar.dev`.
+2. Trigger `Show` via DBus (see "Testing in the nested shell" above). First call is cold; subsequent are warm.
+3. For warm p95, repeat 20+ times with ~500ms gaps between Show/Hide cycles, then aggregate `[perf] dialog.open: toIdle=Xms` values from the journal.
+
+Reference baseline measured on `perf-fork` HEAD (PR #130 + PR #133 from upstream, with 396-entry mixed real data, host shell + 5 extensions enabled):
+- Cold sync 1165ms, cold toIdle 1306ms — **13× over budget**, lazy-realization fix needed.
+- Warm median ~150ms, p95 ~250ms — **1.5–2.5× over budget**, finer in-`open()` spans needed to identify hot spot.
+
 ### Useful Resources
 - https://gjs.guide/extensions/
 - https://gjs-docs.gnome.org/
