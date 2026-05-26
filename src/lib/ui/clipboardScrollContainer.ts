@@ -1,4 +1,5 @@
 import Clutter from 'gi://Clutter';
+import GLib from 'gi://GLib';
 import St from 'gi://St';
 
 import type CopyousExtension from '../../extension.js';
@@ -14,11 +15,26 @@ import { ClipboardItem } from './items/clipboardItem.js';
 import { State, StatusItem } from './items/statusItem.js';
 import { SearchChange, SearchQuery } from './searchEntry.js';
 
+// How many items to insert into the container eagerly during bulk load.
+// Items past this index are held in a deferred queue and inserted in idle
+// batches after the dialog has been shown, so dialog.show() doesn't have to
+// realize 400+ children synchronously on first open.
+const INITIAL_VISIBLE_BATCH = 30;
+const DEFERRED_BATCH_SIZE = 20;
+
 @registerClass()
 export class ClipboardScrollContainer extends St.BoxLayout {
 	private readonly _statusItem: StatusItem;
+	private readonly _ext: CopyousExtension;
 	private _lastFocus: Clutter.Actor | null = null;
 	private _lastQuery: SearchQuery | null = null;
+
+	// Lazy-realize state: during bulk load, items past INITIAL_VISIBLE_BATCH go
+	// into _deferred and are drained later via realizeDeferred().
+	private _bulkLoading: boolean = false;
+	private _bulkLoadCount: number = 0;
+	private _deferred: ClipboardItem[] = [];
+	private _deferredIdleId: number = -1;
 
 	constructor(ext: CopyousExtension) {
 		super({
@@ -27,8 +43,51 @@ export class ClipboardScrollContainer extends St.BoxLayout {
 			x_expand: false,
 		});
 
+		this._ext = ext;
 		this._statusItem = new StatusItem(ext);
 		this.updateVisible();
+	}
+
+	public beginBulkLoad(): void {
+		this._bulkLoading = true;
+		this._bulkLoadCount = 0;
+	}
+
+	public endBulkLoad(): void {
+		this._bulkLoading = false;
+	}
+
+	override destroy(): void {
+		if (this._deferredIdleId >= 0) {
+			GLib.source_remove(this._deferredIdleId);
+			this._deferredIdleId = -1;
+		}
+		this._deferred.length = 0;
+		super.destroy();
+	}
+
+	public realizeDeferred(): void {
+		if (this._deferredIdleId >= 0) return; // drain already in progress
+		if (this._deferred.length === 0) return;
+
+		/* DEBUG-ONLY */ const _tStart = GLib.get_monotonic_time();
+		/* DEBUG-ONLY */ const _initialCount = this._deferred.length;
+
+		this._deferredIdleId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+			const batch = this._deferred.splice(0, DEFERRED_BATCH_SIZE);
+			for (const item of batch) {
+				this.insertOrMoveItem(item, true);
+			}
+			if (this._deferred.length === 0) {
+				this._deferredIdleId = -1;
+				/* DEBUG-ONLY */ const elapsed = (GLib.get_monotonic_time() - _tStart) / 1000;
+				/* DEBUG-ONLY */ this._ext.logger.log(
+					/* DEBUG-ONLY */ `[perf] realizeDeferred: ${_initialCount} items in ${elapsed.toFixed(0)}ms`,
+				);
+				return GLib.SOURCE_REMOVE;
+			}
+			return GLib.SOURCE_CONTINUE;
+		});
 	}
 
 	private updateVisible() {
@@ -118,9 +177,21 @@ export class ClipboardScrollContainer extends St.BoxLayout {
 	}
 
 	public addItem(item: ClipboardItem): void {
-		this.insertOrMoveItem(item);
+		// During bulk load (initEntryTracker), only the first INITIAL_VISIBLE_BATCH
+		// items get inserted into the container synchronously. The rest are
+		// queued in _deferred and drained later via realizeDeferred() so that
+		// dialog.show()'s realize cascade doesn't touch hundreds of children at
+		// once. Entries arrive newest-first (MemoryDatabase.entries() sorts by
+		// datetime desc), so the newest 30 stay visible immediately.
+		if (this._bulkLoading && this._bulkLoadCount >= INITIAL_VISIBLE_BATCH) {
+			this._deferred.push(item);
+		} else {
+			this.insertOrMoveItem(item);
+		}
+		if (this._bulkLoading) this._bulkLoadCount++;
 
-		// Move item when datetime changes
+		// Move item when datetime changes — also moves deferred items into the
+		// container if their datetime changes before realizeDeferred drains them.
 		item.entry.connect('notify::datetime', () => this.insertOrMoveItem(item, false));
 
 		// Delete item when deleted

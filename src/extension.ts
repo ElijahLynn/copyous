@@ -266,9 +266,11 @@ export default class CopyousExtension extends Extension {
 		/* DEBUG-ONLY */ const t0 = GLib.get_monotonic_time();
 		const entries = await this.entryTracker.init();
 		/* DEBUG-ONLY */ const tLoaded = GLib.get_monotonic_time();
+		this.clipboardDialog?.beginBulkLoad();
 		for (const entry of entries) {
 			this.clipboardDialog?.addEntry(entry);
 		}
+		this.clipboardDialog?.endBulkLoad();
 		/* DEBUG-ONLY */ const tBuilt = GLib.get_monotonic_time();
 		/* DEBUG-ONLY */ this.logger.log(
 			`[perf] initEntryTracker: ${entries.length} entries, load=${((tLoaded - t0) / 1000).toFixed(0)}ms build=${((tBuilt - tLoaded) / 1000).toFixed(0)}ms`,

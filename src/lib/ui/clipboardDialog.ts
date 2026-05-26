@@ -429,6 +429,7 @@ export class ClipboardDialog extends St.Widget {
 		this._nextCursor = this._cursor;
 
 		const grab = Main.pushModal(this, { actionMode: Shell.ActionMode.SYSTEM_MODAL }) as Clutter.Grab;
+		/* DEBUG-ONLY */ const _perfTGrab = GLib.get_monotonic_time();
 		// GNOME 50 (Mutter 18) removed get_seat_state()/GrabState in favor of is_revoked()
 		const grabFailed =
 			VERSION >= 50
@@ -442,9 +443,16 @@ export class ClipboardDialog extends St.Widget {
 		this._grab = grab;
 		this._monitorConstraint.index = global.display.get_current_monitor();
 		Main.layoutManager.emit('system-modal-opened');
+		/* DEBUG-ONLY */ const _perfTEmit = GLib.get_monotonic_time();
 
 		this._dialog.opacity = 0;
 		this.show();
+		/* DEBUG-ONLY */ const _perfTShow = GLib.get_monotonic_time();
+
+		// Start draining any items deferred during bulk load. The first batch
+		// fires after this open() returns and the dialog has painted, so the
+		// initial show() only had to realize the first ~30 children.
+		this._scrollView.realizeDeferred();
 
 		const horizontal = this._orientation === Clutter.Orientation.HORIZONTAL;
 		if (horizontal && this._dialog.y_align === Clutter.ActorAlign.START) {
@@ -486,10 +494,13 @@ export class ClipboardDialog extends St.Widget {
 		});
 
 		/* DEBUG-ONLY */ const _perfT1 = GLib.get_monotonic_time();
+		/* DEBUG-ONLY */ const _perfMs = (a: number, b: number) => ((b - a) / 1000).toFixed(0);
 		/* DEBUG-ONLY */ GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
 			const t2 = GLib.get_monotonic_time();
 			this.ext.logger.log(
-				`[perf] dialog.open: sync=${((_perfT1 - _perfT0) / 1000).toFixed(0)}ms toIdle=${((t2 - _perfT0) / 1000).toFixed(0)}ms`,
+				`[perf] dialog.open: sync=${_perfMs(_perfT0, _perfT1)}ms toIdle=${_perfMs(_perfT0, t2)}ms ` +
+					`(grab=${_perfMs(_perfT0, _perfTGrab)}ms emit=${_perfMs(_perfTGrab, _perfTEmit)}ms ` +
+					`show=${_perfMs(_perfTEmit, _perfTShow)}ms tail=${_perfMs(_perfTShow, _perfT1)}ms)`,
 			);
 			return GLib.SOURCE_REMOVE;
 		});
@@ -651,6 +662,14 @@ export class ClipboardDialog extends St.Widget {
 
 	public clearEntries() {
 		this._scrollView.clearItems();
+	}
+
+	public beginBulkLoad() {
+		this._scrollView.beginBulkLoad();
+	}
+
+	public endBulkLoad() {
+		this._scrollView.endBulkLoad();
 	}
 
 	private openSettings() {
