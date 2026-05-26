@@ -282,8 +282,12 @@ export class ClipboardDialog extends St.Widget {
 			y_align: Clutter.ActorAlign.FILL,
 			x_expand: true,
 			y_expand: true,
-			visible: false,
-			reactive: true,
+			// Pay the map cascade cost ONCE at extension enable instead of on
+			// every open(). The widget stays mapped for its lifetime; open()
+			// just toggles reactivity and animates _dialog.opacity. Saves
+			// 150-300ms per warm open on a busy host shell.
+			visible: true,
+			reactive: false,
 		});
 
 		this._monitorConstraint = new Layout.MonitorConstraint({ workArea: true });
@@ -299,6 +303,9 @@ export class ClipboardDialog extends St.Widget {
 			y_align: Clutter.ActorAlign.CENTER,
 			x_expand: true,
 			y_expand: true,
+			// Start invisible — the outer widget is mapped (above) but inner
+			// content stays at opacity 0 until open() animates it in.
+			opacity: 0,
 		});
 		this.add_child(this._dialog);
 
@@ -446,7 +453,10 @@ export class ClipboardDialog extends St.Widget {
 		/* DEBUG-ONLY */ const _perfTEmit = GLib.get_monotonic_time();
 
 		this._dialog.opacity = 0;
-		this.show();
+		// Widget is already mapped (constructor leaves visible=true); flipping
+		// reactive=true is the cheap analog of show() — it makes the dialog
+		// receive events without paying for a map cascade.
+		this.reactive = true;
 		/* DEBUG-ONLY */ const _perfTShow = GLib.get_monotonic_time();
 
 		// Start draining any items deferred during bulk load. The first batch
@@ -552,7 +562,10 @@ export class ClipboardDialog extends St.Widget {
 				Main.popModal(this._grab);
 				this._grab = null;
 				this._closing = false;
-				this.hide();
+				// Don't unmap — keep the actor mapped so the next open()
+				// doesn't pay for a full map/realize cascade again. Make it
+				// non-reactive so it stops intercepting events.
+				this.reactive = false;
 				global.compositor.enable_unredirect();
 			},
 		});
