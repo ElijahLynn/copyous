@@ -150,7 +150,10 @@ $(DIST_DIR)/css/template-%.css: \
 		resources/css/template.scss scripts/template/postcss.config.cjs \
 		resources/css/themes/default/_*.scss resources/css/themes/default/widgets | $(DIST_DIR)
 	@mkdir -p $(DIST_DIR)/css
-	VARIANT=$* pnpm exec postcss $< --config scripts/template | pnpm exec sass --no-source-map --stdin $@
+# pnpm >= 11 prints "Already up to date / Done in …" to stdout on every `exec`;
+# silence it here so that noise doesn't get piped into `sass --stdin` (which
+# would then try to parse it as CSS and fail with `expected "{"`).
+	VARIANT=$* pnpm --silent exec postcss $< --config scripts/template | pnpm --silent exec sass --no-source-map --stdin $@
 
 CSS := $(THEME_CSS) $(DIST_DIR)/css/template-dark.css $(DIST_DIR)/css/template-light.css
 
