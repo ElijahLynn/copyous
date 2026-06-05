@@ -454,7 +454,9 @@ export class ClipboardDialog extends St.Widget {
 		this._dialog.opacity = 0;
 		// Widget is already mapped (constructor leaves visible=true). Skip
 		// this.show() to avoid the per-open map cascade. Hit-testing is
-		// controlled by vfunc_pick checking this._open.
+		// controlled by vfunc_pick checking this._open. Run the per-open
+		// setup that vfunc_map used to handle (fit constraint, initial focus).
+		this.firstOpenSetup();
 		/* DEBUG-ONLY */ const _perfTShow = GLib.get_monotonic_time();
 
 		// Start draining any items deferred during bulk load. The first batch
@@ -884,11 +886,18 @@ export class ClipboardDialog extends St.Widget {
 
 	override vfunc_map(): void {
 		super.vfunc_map();
+		// Previously did per-open setup (updateFitConstraint + initial focus)
+		// here on the assumption that show() in open() would re-fire vfunc_map.
+		// With the pre-mapped dialog change, vfunc_map only fires once at
+		// construction — when _scrollView, _header etc. are still undefined.
+		// The per-open setup moved into open() directly. Keep vfunc_map clean.
+	}
 
-		// Update fit constraint
+	private firstOpenSetup() {
+		// Update fit constraint position relative to current pointer
 		this.updateFitConstraint();
 
-		// Navigate to first item
+		// Navigate to first item, or fall back to focusing the search entry
 		if (!this._scrollView.navigate_focus(null, St.DirectionType.DOWN, false)) {
 			this._header.updateHeader(true, false);
 			this._header.searchEntry.grab_key_focus();
