@@ -16,11 +16,10 @@ import { State, StatusItem } from './items/statusItem.js';
 import { SearchChange, SearchQuery } from './searchEntry.js';
 
 // How many items to insert into the container eagerly during bulk load.
-// Items past this index are held in a deferred queue and inserted in idle
-// batches after the dialog has been shown, so dialog.show() doesn't have to
-// realize 400+ children synchronously on first open.
+// Items past this index are held in a deferred queue and realized on demand
+// (first search / scroll-to-end / navigate-past-last), so dialog.show()
+// doesn't have to realize 400+ children synchronously on first open.
 const INITIAL_VISIBLE_BATCH = 30;
-const DEFERRED_BATCH_SIZE = 20;
 
 @registerClass()
 export class ClipboardScrollContainer extends St.BoxLayout {
@@ -34,7 +33,6 @@ export class ClipboardScrollContainer extends St.BoxLayout {
 	private _bulkLoading: boolean = false;
 	private _bulkLoadCount: number = 0;
 	private _deferred: ClipboardItem[] = [];
-	private _deferredIdleId: number = -1;
 
 	constructor(ext: CopyousExtension) {
 		super({
@@ -58,36 +56,47 @@ export class ClipboardScrollContainer extends St.BoxLayout {
 	}
 
 	override destroy(): void {
-		if (this._deferredIdleId >= 0) {
-			GLib.source_remove(this._deferredIdleId);
-			this._deferredIdleId = -1;
-		}
 		this._deferred.length = 0;
 		super.destroy();
 	}
 
-	public realizeDeferred(): void {
-		if (this._deferredIdleId >= 0) return; // drain already in progress
+	/**
+	 * Realize every item held back during bulk load, immediately and
+	 * synchronously. Called the moment the user actually needs the full list —
+	 * when they search, scroll toward the end, or navigate past the last loaded
+	 * item — so there is no background drain competing with a busy shell's main
+	 * loop (which stretched the old idle drain to ~5s on a loaded host). No-op
+	 * once the queue has been drained.
+	 */
+	public realizeDeferredNow(): void {
 		if (this._deferred.length === 0) return;
 
 		/* DEBUG-ONLY */ const _tStart = GLib.get_monotonic_time();
 		/* DEBUG-ONLY */ const _initialCount = this._deferred.length;
 
-		this._deferredIdleId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-			const batch = this._deferred.splice(0, DEFERRED_BATCH_SIZE);
-			for (const item of batch) {
-				this.insertOrMoveItem(item, true);
-			}
-			if (this._deferred.length === 0) {
-				this._deferredIdleId = -1;
-				/* DEBUG-ONLY */ const elapsed = (GLib.get_monotonic_time() - _tStart) / 1000;
-				/* DEBUG-ONLY */ this._ext.logger.log(
-					/* DEBUG-ONLY */ `[perf] realizeDeferred: ${_initialCount} items in ${elapsed.toFixed(0)}ms`,
-				);
-				return GLib.SOURCE_REMOVE;
-			}
-			return GLib.SOURCE_CONTINUE;
-		});
+		// Deferred items are older than every item already in the container (the
+		// eager batch holds the newest INITIAL_VISIBLE_BATCH, and any runtime
+		// insert is newer still) and the queue is itself in datetime-desc order,
+		// so each item belongs at the very end — no sorted scan needed. Append
+		// them all (O(1) each), then do the visible / pseudo-class bookkeeping
+		// once instead of once per item.
+		const batch = this._deferred;
+		this._deferred = [];
+
+		this.removePseudoclasses();
+		for (const item of batch) {
+			// A datetime change can move a still-deferred item into the
+			// container before we drain it; don't append it a second time.
+			if (item.get_parent() === this) continue;
+			this.add_child(item);
+			if (this._lastQuery) item.search(this._lastQuery);
+		}
+		this.updateVisible(); // restores first-/last-child pseudo-classes
+
+		/* DEBUG-ONLY */ const _elapsed = (GLib.get_monotonic_time() - _tStart) / 1000;
+		/* DEBUG-ONLY */ this._ext.logger.log(
+			/* DEBUG-ONLY */ `[perf] realizeDeferredNow: ${_initialCount} items in ${_elapsed.toFixed(0)}ms`,
+		);
 	}
 
 	private updateVisible() {
@@ -179,10 +188,12 @@ export class ClipboardScrollContainer extends St.BoxLayout {
 	public addItem(item: ClipboardItem): void {
 		// During bulk load (initEntryTracker), only the first INITIAL_VISIBLE_BATCH
 		// items get inserted into the container synchronously. The rest are
-		// queued in _deferred and drained later via realizeDeferred() so that
-		// dialog.show()'s realize cascade doesn't touch hundreds of children at
-		// once. Entries arrive newest-first (MemoryDatabase.entries() sorts by
-		// datetime desc), so the newest 30 stay visible immediately.
+		// queued in _deferred and realized on demand via realizeDeferredNow() —
+		// the first time the user searches, scrolls toward the end, or navigates
+		// past the last loaded item — so dialog.show()'s realize cascade doesn't
+		// touch hundreds of children at once. Entries arrive newest-first
+		// (MemoryDatabase.entries() sorts by datetime desc), so the newest 30 stay
+		// visible immediately.
 		if (this._bulkLoading && this._bulkLoadCount >= INITIAL_VISIBLE_BATCH) {
 			this._deferred.push(item);
 		} else {
@@ -191,7 +202,7 @@ export class ClipboardScrollContainer extends St.BoxLayout {
 		if (this._bulkLoading) this._bulkLoadCount++;
 
 		// Move item when datetime changes — also moves deferred items into the
-		// container if their datetime changes before realizeDeferred drains them.
+		// container if their datetime changes before they are realized.
 		item.entry.connect('notify::datetime', () => this.insertOrMoveItem(item, false));
 
 		// Delete item when deleted
@@ -232,6 +243,10 @@ export class ClipboardScrollContainer extends St.BoxLayout {
 	}
 
 	public clearItems(): void {
+		// Drop anything still held back from bulk load; get_children() never
+		// sees the deferred queue, so it must be cleared explicitly.
+		this._deferred.length = 0;
+
 		let focus = false;
 		for (const child of this.get_children()) {
 			if (child instanceof ClipboardItem) {
@@ -248,6 +263,12 @@ export class ClipboardScrollContainer extends St.BoxLayout {
 	}
 
 	public removeItem(child: ClipboardItem): void {
+		// History pruning (deleteOldest) deletes the oldest entries, which are
+		// exactly the ones still sitting in the deferred queue. Drop them there
+		// so they never get realized after deletion.
+		const deferredIndex = this._deferred.indexOf(child);
+		if (deferredIndex >= 0) this._deferred.splice(deferredIndex, 1);
+
 		if (child.get_parent() !== this) return;
 
 		const hasKeyFocus = child.has_key_focus();
@@ -307,6 +328,10 @@ export class ClipboardScrollContainer extends St.BoxLayout {
 	}
 
 	public search(query: SearchQuery): void {
+		// A search has to consider every entry, so pull in anything still held
+		// back from bulk load before filtering. No-op once already realized.
+		this.realizeDeferredNow();
+
 		// Copy search query, but with SearchChange.Different to always force re-search
 		this._lastQuery = query.withChange(SearchChange.Different);
 
@@ -350,6 +375,21 @@ export class ClipboardScrollContainer extends St.BoxLayout {
 	}
 
 	override vfunc_navigate_focus(from: Clutter.Actor | null, direction: St.DirectionType): boolean {
+		// If navigating forward off the last loaded item, realize the rest of
+		// the list first so there is somewhere to go. Gated on `from` actually
+		// being the last loaded item, so opening the dialog (which focuses the
+		// first item via navigate_focus(null, DOWN)) doesn't trigger a drain.
+		if (
+			this._deferred.length > 0 &&
+			from !== null &&
+			(direction === St.DirectionType.DOWN ||
+				direction === St.DirectionType.RIGHT ||
+				direction === St.DirectionType.TAB_FORWARD) &&
+			from === get_last_visible_child(this)
+		) {
+			this.realizeDeferredNow();
+		}
+
 		// Navigation from the search entry
 		if (from?.get_parent() !== this) {
 			// If tab navigation is used, then focus on first or last child

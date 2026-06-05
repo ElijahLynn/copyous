@@ -449,10 +449,10 @@ export class ClipboardDialog extends St.Widget {
 		this.show();
 		/* DEBUG-ONLY */ const _perfTShow = GLib.get_monotonic_time();
 
-		// Start draining any items deferred during bulk load. The first batch
-		// fires after this open() returns and the dialog has painted, so the
-		// initial show() only had to realize the first ~30 children.
-		this._scrollView.realizeDeferred();
+		// Items past the initial viewport stay deferred until the user actually
+		// needs them — realizeDeferredNow() fires on first search / scroll-to-end
+		// / navigate-past-last (see ClipboardScrollContainer). No background drain
+		// runs here, so a busy shell's main loop is never tied up after open.
 
 		const horizontal = this._orientation === Clutter.Orientation.HORIZONTAL;
 		if (horizontal && this._dialog.y_align === Clutter.ActorAlign.START) {

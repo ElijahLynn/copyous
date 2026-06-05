@@ -90,8 +90,8 @@ export class ClipboardScrollView extends St.ScrollView {
 		this._scrollContainer.endBulkLoad();
 	}
 
-	public realizeDeferred() {
-		this._scrollContainer.realizeDeferred();
+	public realizeDeferredNow() {
+		this._scrollContainer.realizeDeferredNow();
 	}
 
 	public clearItems() {
@@ -160,6 +160,8 @@ export class ClipboardScrollView extends St.ScrollView {
 
 		// End
 		if (key === Clutter.KEY_End) {
+			// Jumping to the end must realize the full list first.
+			this._scrollContainer.realizeDeferredNow();
 			const child = get_last_visible_child(this._scrollContainer);
 			if (child) {
 				this._scrollContainer.focusChild(child);
@@ -188,6 +190,10 @@ export class ClipboardScrollView extends St.ScrollView {
 		}
 
 		if (delta === 0) return Clutter.EVENT_STOP;
+
+		// Scrolling toward the end: realize any items still held back from bulk
+		// load so the user can actually reach them. No-op once already realized.
+		if (delta > 0) this._scrollContainer.realizeDeferredNow();
 
 		const spacing = (this._scrollContainer.get_layout_manager() as Clutter.BoxLayout).spacing;
 
