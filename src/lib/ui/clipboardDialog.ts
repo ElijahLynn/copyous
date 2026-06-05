@@ -282,12 +282,13 @@ export class ClipboardDialog extends St.Widget {
 			y_align: Clutter.ActorAlign.FILL,
 			x_expand: true,
 			y_expand: true,
-			// Pay the map cascade cost ONCE at extension enable instead of on
-			// every open(). The widget stays mapped for its lifetime; open()
-			// just toggles reactivity and animates _dialog.opacity. Saves
-			// 150-300ms per warm open on a busy host shell.
+			// Keep the widget mapped so dialog.open() doesn't pay for a full
+			// realize/map cascade on every invocation. vfunc_pick (below)
+			// excludes the dialog from hit-testing while closed, so the
+			// invisible-but-mapped widget doesn't intercept clicks meant for
+			// other actors. Inner _dialog stays at opacity 0 until open().
 			visible: true,
-			reactive: false,
+			reactive: true,
 		});
 
 		this._monitorConstraint = new Layout.MonitorConstraint({ workArea: true });
@@ -303,8 +304,6 @@ export class ClipboardDialog extends St.Widget {
 			y_align: Clutter.ActorAlign.CENTER,
 			x_expand: true,
 			y_expand: true,
-			// Start invisible — the outer widget is mapped (above) but inner
-			// content stays at opacity 0 until open() animates it in.
 			opacity: 0,
 		});
 		this.add_child(this._dialog);
@@ -453,10 +452,9 @@ export class ClipboardDialog extends St.Widget {
 		/* DEBUG-ONLY */ const _perfTEmit = GLib.get_monotonic_time();
 
 		this._dialog.opacity = 0;
-		// Widget is already mapped (constructor leaves visible=true); flipping
-		// reactive=true is the cheap analog of show() — it makes the dialog
-		// receive events without paying for a map cascade.
-		this.reactive = true;
+		// Widget is already mapped (constructor leaves visible=true). Skip
+		// this.show() to avoid the per-open map cascade. Hit-testing is
+		// controlled by vfunc_pick checking this._open.
 		/* DEBUG-ONLY */ const _perfTShow = GLib.get_monotonic_time();
 
 		// Start draining any items deferred during bulk load. The first batch
@@ -562,10 +560,9 @@ export class ClipboardDialog extends St.Widget {
 				Main.popModal(this._grab);
 				this._grab = null;
 				this._closing = false;
-				// Don't unmap — keep the actor mapped so the next open()
-				// doesn't pay for a full map/realize cascade again. Make it
-				// non-reactive so it stops intercepting events.
-				this.reactive = false;
+				// Don't unmap — vfunc_pick will now skip hit-testing on the
+				// dialog tree because this._open became false at the top of
+				// close(), so clicks pass through to whatever's underneath.
 				global.compositor.enable_unredirect();
 			},
 		});
@@ -776,6 +773,16 @@ export class ClipboardDialog extends St.Widget {
 		if (unicode === 0) return false;
 
 		return String.fromCharCode(unicode).trim().length > 0;
+	}
+
+	// The widget stays visible+mapped for its whole lifetime so that open()
+	// can skip the expensive Clutter realize/map cascade. To prevent the
+	// invisible (opacity=0) dialog tree from capturing clicks meant for
+	// actors underneath when closed, we override pick to a no-op unless the
+	// dialog is open or in the middle of opening/closing animation.
+	override vfunc_pick(pickContext: Clutter.PickContext): void {
+		if (!this._open && !this._closing) return;
+		super.vfunc_pick(pickContext);
 	}
 
 	override vfunc_key_press_event(event: Clutter.Event): boolean {
