@@ -78,7 +78,7 @@ export default class Preferences extends ExtensionPreferences {
 		});
 		window.add(general);
 
-		general.add(new VersionSettings(this));
+		general.add(new VersionSettings(this, window));
 		general.add(new HistorySettings(this, window));
 		const feedback = new FeedbackSettings(this, window);
 		dependenciesButton.bind_property('gsound', feedback, 'gsound', GObject.BindingFlags.SYNC_CREATE);

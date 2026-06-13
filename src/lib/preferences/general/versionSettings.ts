@@ -1,4 +1,5 @@
 import Adw from 'gi://Adw';
+import Gtk from 'gi://Gtk';
 
 import { gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
@@ -7,7 +8,7 @@ import { registerClass } from '../../common/gjs.js';
 
 @registerClass()
 export class VersionSettings extends Adw.PreferencesGroup {
-	constructor(prefs: Preferences) {
+	constructor(prefs: Preferences, window: Adw.PreferencesWindow) {
 		const version =
 			prefs.metadata['version-name']?.toString() ?? prefs.metadata['version']?.toString() ?? _('Unknown');
 
@@ -15,12 +16,27 @@ export class VersionSettings extends Adw.PreferencesGroup {
 			title: _('Version'),
 		});
 
-		this.add(
-			new Adw.ActionRow({
-				title: version,
-				subtitle: _('Installed build'),
-				activatable: false,
-			}),
-		);
+		const row = new Adw.ActionRow({
+			title: version,
+			subtitle: _('Installed build'),
+		});
+
+		const copyButton = new Gtk.Button({
+			icon_name: 'edit-copy-symbolic',
+			valign: Gtk.Align.CENTER,
+			css_classes: ['flat'],
+			tooltip_text: _('Copy version'),
+		});
+		copyButton.connect('clicked', () => {
+			window.get_display().get_clipboard().set(version);
+			window.add_toast(
+				new Adw.Toast({
+					title: _('Copied to clipboard'),
+				}),
+			);
+		});
+		row.add_suffix(copyButton);
+
+		this.add(row);
 	}
 }
