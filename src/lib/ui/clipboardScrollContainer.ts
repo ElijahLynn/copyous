@@ -120,6 +120,32 @@ export class ClipboardScrollContainer extends St.BoxLayout {
 	public addItem(item: ClipboardItem): void {
 		this.insertOrMoveItem(item);
 
+		if (this._lastQuery) {
+			item.search(this._lastQuery);
+		}
+
+		this.connectItemSignals(item);
+	}
+
+	public loadItems(items: ClipboardItem[]): void {
+		if (items.length === 0) {
+			this.updateVisible();
+			return;
+		}
+
+		this.removePseudoclasses();
+		if (this._statusItem.get_parent() !== null) this.remove_child(this._statusItem);
+
+		for (const item of items) {
+			if (item.get_parent() === this) this.remove_child(item);
+			this.add_child(item);
+			this.connectItemSignals(item);
+		}
+
+		this.updateVisible();
+	}
+
+	private connectItemSignals(item: ClipboardItem): void {
 		// Move item when datetime changes
 		item.entry.connect('notify::datetime', () => this.insertOrMoveItem(item, false));
 
