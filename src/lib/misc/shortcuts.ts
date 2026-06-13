@@ -21,6 +21,7 @@ export const Shortcut = {
 	Edit: 'edit-item-shortcut',
 	EditTitle: 'edit-title-shortcut',
 	Menu: 'open-menu-shortcut',
+	TogglePinnedSearch: 'toggle-pinned-search-shortcut',
 } as const;
 
 export type Shortcut = (typeof Shortcut)[keyof typeof Shortcut];
@@ -82,6 +83,7 @@ export class ShortcutManager extends GObject.Object {
 		this.registerShortcut(Shortcut.Edit);
 		this.registerShortcut(Shortcut.EditTitle);
 		this.registerShortcut(Shortcut.Menu);
+		this.registerShortcut(Shortcut.TogglePinnedSearch);
 
 		this._actor = actor;
 		actor.connectObject(
